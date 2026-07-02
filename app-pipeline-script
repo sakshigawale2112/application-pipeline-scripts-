@@ -5,7 +5,8 @@ pipeline {
 
         stage('Pull Source Code') {
             steps {
-                git branch: 'test', url: 'https://github.com/jambhulkarcloudblitz-alt/CDEC-studentapp.git'
+                git branch: 'test', 
+                    url: 'https://github.com/jambhulkarcloudblitz-alt/CDEC-studentapp.git'
             }
         }
 
