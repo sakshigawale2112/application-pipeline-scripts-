@@ -1,44 +1,15 @@
 pipeline {
     agent any
 
-    parameters {
-        choice(name: 'ENV', choices: ['dev', 'stage', 'prod'], description: 'Select Environment')
-    }
-
-    environment {
-        BACKEND_IMAGE = "sakshigawale2112/easy-deploy-backend:${params.ENV}"
-        FRONTEND_IMAGE = "sakshigawale2112/easy-deploy-frontend:${params.ENV}"
-    }
-
     stages {
 
-        stage('Checkout') {
+        stage('Pull Source Code') {
             steps {
-                git branch: 'main',
-                url: 'https://github.com/jambhulkarcloudblitz-alt/CDEC-studentapp.git'
+                git branch: 'main', url: 'https://github.com/jambhulkarcloudblitz-alt/CDEC-studentapp.git'
             }
         }
 
-        stage('Build Backend') {
-            steps {
-                sh '''
-                    cd backend
-                    mvn clean package -DskipTests
-                '''
-            }
-        }
-
-        stage('Build Frontend') {
-            steps {
-                sh '''
-                    cd frontend
-                    npm install
-                    npm run build
-                '''
-            }
-        }
-
-        stage('Docker Build & Push') {
+        stage('Build & Push Docker Images') {
             steps {
                 withCredentials([
                     string(credentialsId: 'docker-username', variable: 'DOCKER_USERNAME'),
@@ -49,22 +20,31 @@ pipeline {
 
                         # Backend
                         cd backend
-                        docker build -t $BACKEND_IMAGE .
-                        docker push $BACKEND_IMAGE
+                        docker build -t sakshigawale2112/easy-deploy-backend:latest .
+                        docker push sakshigawale2112/easy-deploy-backend:latest
 
                         # Frontend
                         cd ../frontend
-                        docker build -t $FRONTEND_IMAGE .
-                        docker push $FRONTEND_IMAGE
+                        docker build -t sakshigawale2112/easy-deploy-frontend:latest .
+                        docker push sakshigawale2112/easy-deploy-frontend:latest
                     '''
                 }
             }
         }
 
-        stage('Deploy to K8s') {
+        stage('Clean Images') {
             steps {
                 sh '''
-                    kubectl apply -f k8s/${ENV}/
+                    docker rmi -f sakshigawale2112/easy-deploy-backend:latest || true
+                    docker rmi -f sakshigawale2112/easy-deploy-frontend:latest || true
+                '''
+            }
+        }
+
+        stage('Deploy to Kubernetes') {
+            steps {
+                sh '''
+                    kubectl apply -f simple-deploy/
                 '''
             }
         }
