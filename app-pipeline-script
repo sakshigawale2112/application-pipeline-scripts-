@@ -1,15 +1,29 @@
 pipeline {
     agent any
-
     stages {
-
         stage('Pull Source Code') {
             steps {
                 git branch: 'test', 
                     url: 'https://github.com/jambhulkarcloudblitz-alt/CDEC-studentapp.git'
             }
         }
-
+        stage('Build Backend (Maven)') {
+            steps {
+                dir('backend') {
+                    sh 'mvn clean package -DskipTests'
+                }
+            }
+        }
+        stage('Build Frontend (NPM)') {
+            steps {
+                dir('frontend') {
+                    sh '''
+                        npm install
+                        npm run build
+                    '''
+                }
+            }
+        }
         stage('Build & Push Docker Images') {
             steps {
                 withCredentials([
@@ -23,16 +37,17 @@ pipeline {
                         cd backend
                         docker build -t sakshigawale2112/easy-deploy-backend:latest .
                         docker push sakshigawale2112/easy-deploy-backend:latest
+                        cd ..
 
                         # Frontend
-                        cd ../frontend
+                        cd frontend
                         docker build -t sakshigawale2112/easy-deploy-frontend:latest .
                         docker push sakshigawale2112/easy-deploy-frontend:latest
+                        cd ..
                     '''
                 }
             }
         }
-
         stage('Clean Images') {
             steps {
                 sh '''
@@ -41,7 +56,6 @@ pipeline {
                 '''
             }
         }
-
         stage('Deploy to Kubernetes') {
             steps {
                 sh '''
