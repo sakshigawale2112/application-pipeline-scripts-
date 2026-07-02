@@ -1,0 +1,53 @@
+pipeline {
+    agent any
+
+    stages {
+
+        stage('Pull') {
+            steps {
+                git branch: 'main',
+                    url: 'https://github.com/jambhulkarcloudblitz-alt/CDEC-studentapp.git'
+            }
+        }
+
+        stage('Build & Push Docker Images') {
+            steps {
+                withCredentials([
+                    string(credentialsId: 'docker-username', variable: 'DOCKER_USERNAME'),
+                    string(credentialsId: 'docker-cred', variable: 'DOCKER_PASSWORD')
+                ]) {
+                    sh '''
+                        echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
+
+                        # Backend
+                        cd backend
+                        docker build -t sakshigawale2112/easy-deploy-backend:latest .
+                        docker push sakshigawale2112/easy-deploy-backend:latest
+
+                        # Frontend
+                        cd ../frontend
+                        docker build -t sakshigawale2112/easy-deploy-frontend:latest .
+                        docker push sakshigawale2112/easy-deploy-frontend:latest
+                    '''
+                }
+            }
+        }
+
+        stage('Remove Local Images') {
+            steps {
+                sh '''
+                    docker rmi -f sakshigawale2112/easy-deploy-backend:latest || true
+                    docker rmi -f sakshigawale2112/easy-deploy-frontend:latest || true
+                '''
+            }
+        }
+
+        stage('Deploy') {
+            steps {
+                sh '''
+                    kubectl apply -f simple-deploy/
+                '''
+            }
+        }
+    }
+}
