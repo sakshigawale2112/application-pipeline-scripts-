@@ -1,67 +1,59 @@
 pipeline {
-    agent any
+    agent any 
     stages {
-        stage('Pull Source Code') {
-            steps {
-                git branch: 'test', 
-                    url: 'https://github.com/jambhulkarcloudblitz-alt/CDEC-studentapp.git'
-            }
+        stage ('PULL'){
+        steps {
+            git branch: 'test', url: 'https://github.com/kottalayash/CDEC-studentapp.git'
         }
-        stage('Build Backend (Maven)') {
-            steps {
-                dir('backend') {
-                    sh 'mvn clean package -DskipTests'
-                }
-            }
+    } 
+        stage ('DOCKER-FRONTED') {
+        steps {
+            sh '''cd frontend
+            docker build -t kottalayash/frontend:latest .'''
         }
-        stage('Build Frontend (NPM)') {
-            steps {
-                dir('frontend') {
-                    sh '''
-                        npm install
-                        npm run build
-                    '''
-                }
-            }
+    }   
+        stage ('DOCKER-BACKEND') {
+        steps {
+            sh '''cd backend
+            docker build -t kottalayash/backend:latest .'''            
         }
-        stage('Build & Push Docker Images') {
-            steps {
-                withCredentials([
-                    string(credentialsId: 'docker-username', variable: 'DOCKER_USERNAME'),
-                    string(credentialsId: 'docker-cred', variable: 'DOCKER_PASSWORD')
-                ]) {
-                    sh '''
-                        echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
-
-                        # Backend
-                        cd backend
-                        docker build -t sakshigawale2112/easy-deploy-backend:latest .
-                        docker push sakshigawale2112/easy-deploy-backend:latest
-                        cd ..
-
-                        # Frontend
-                        cd frontend
-                        docker build -t sakshigawale2112/easy-deploy-frontend:latest .
-                        docker push sakshigawale2112/easy-deploy-frontend:latest
-                        cd ..
-                    '''
-                }
-            }
-        }
-        stage('Clean Images') {
-            steps {
-                sh '''
-                    docker rmi -f sakshigawale2112/easy-deploy-backend:latest || true
-                    docker rmi -f sakshigawale2112/easy-deploy-frontend:latest || true
-                '''
-            }
-        }
-        stage('Deploy to Kubernetes') {
-            steps {
-                sh '''
-                    kubectl apply -f simple-deploy/
-                '''
-            }
+    } 
+         stage('DOCKER-LOGIN') {
+    steps {
+        withCredentials([usernamePassword(credentialsId: 'docker-hub-cred', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
+            sh 'echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin'
         }
     }
+}
+        stage ('DOCKER-PUSH') {
+            steps {
+               sh '''docker push kottalayash/frontend:latest 
+                    docker push kottalayash/backend:latest '''
+            }
+        }
+        stage ('RM-IMAGE') {
+            steps {
+                sh 'docker rmi -f $(docker images -aq)'
+            }
+            
+        }
+        stage ('AWS-Cred'){
+            steps {
+                withCredentials([aws(accessKeyVariable: 'AWS_ACCESS_KEY_ID', credentialsId: 'AWS-Cred', secretKeyVariable: 'AWS_SECRET_ACCESS_KEY')]) {
+               }
+            }
+        }  
+        stage('EKS-ACCESS') {
+    steps {
+        sh '''
+        aws eks update-kubeconfig --region ap-south-1 --name my-cluster
+        '''
+    }
+}
+        stage ('KUBECTL-APPLY') {
+            steps{
+                sh 'kubectl apply -f simple-deploy/'
+            }
+        } 
+  }
 }
